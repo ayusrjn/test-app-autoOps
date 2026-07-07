@@ -14,9 +14,13 @@ resource = Resource.create(
 
 provider = TracerProvider(resource=resource)
 
+import os
+
+otlp_endpoint = os.environ.get("OTEL_COLLECTOR_ENDPOINT", "http://localhost:4317")
+
 processor = BatchSpanProcessor(
     OTLPSpanExporter(
-        endpoint="http://localhost:4317",
+        endpoint=otlp_endpoint,
         insecure=True,
     )
 )

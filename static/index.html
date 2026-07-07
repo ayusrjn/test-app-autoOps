@@ -1,0 +1,149 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chronos - Luxury Timepieces</title>
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&family=Playfair+Display:ital,wght@0,400;0,600;0,700;1,400&display=swap" rel="stylesheet">
+    <!-- FontAwesome for Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Custom Style -->
+    <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+    <!-- App Container -->
+    <div class="app-container">
+        <!-- Header -->
+        <header>
+            <div class="logo">
+                <i class="fa-solid fa-hourglass-half gold-text"></i>
+                <span class="brand-name">CHRONOS</span>
+            </div>
+            <div class="nav-actions">
+                <button class="icon-btn" id="view-orders-btn" title="View Order History">
+                    <i class="fa-solid fa-receipt"></i>
+                </button>
+                <button class="cart-trigger" id="cart-toggle-btn">
+                    <i class="fa-solid fa-shopping-bag"></i>
+                    <span id="cart-count">0</span>
+                </button>
+            </div>
+        </header>
+
+        <!-- Main Layout -->
+        <div class="main-layout">
+            <!-- Left Panel: Shop Catalog -->
+            <section class="shop-section">
+                <div class="section-header">
+                    <h2>The Collection</h2>
+                    <div class="filter-bar">
+                        <button class="filter-btn active" data-brand="all">All Brands</button>
+                        <button class="filter-btn" data-brand="Rolex">Rolex</button>
+                        <button class="filter-btn" data-brand="Omega">Omega</button>
+                        <button class="filter-btn" data-brand="Seiko">Seiko</button>
+                        <button class="filter-btn" data-brand="Casio">Casio</button>
+                        <button class="filter-btn" data-brand="Patek Philippe">Patek</button>
+                    </div>
+                </div>
+                <div class="products-grid" id="products-container">
+                    <!-- Products injected by JS -->
+                    <div class="loader">
+                        <i class="fa-solid fa-circle-notch fa-spin"></i> Loading watches...
+                    </div>
+                </div>
+            </section>
+
+            <!-- Right Panel: Sidebar (Cart, Checkout, Simulation panel) -->
+            <aside class="sidebar">
+                <!-- Cart Container -->
+                <div class="panel-card glass" id="cart-panel">
+                    <h3><i class="fa-solid fa-shopping-bag gold-text"></i> Your Cart</h3>
+                    <div class="cart-items-list" id="cart-items-container">
+                        <!-- Items injected by JS -->
+                        <div class="empty-cart-message">Your cart is empty. Add some watches to begin.</div>
+                    </div>
+                    <div class="cart-summary">
+                        <div class="summary-row">
+                            <span>Subtotal:</span>
+                            <span id="cart-total">$0.00</span>
+                        </div>
+                        <div class="cart-actions">
+                            <button class="btn secondary-btn" id="clear-cart-btn">Clear</button>
+                            <button class="btn primary-btn" id="checkout-btn">Checkout</button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- AutoOps Telemetry Simulator Control Panel -->
+                <div class="panel-card glass telemetry-panel">
+                    <h3><i class="fa-solid fa-chart-line gold-text"></i> AutoOps Telemetry Simulator</h3>
+                    <p class="panel-subtitle">Generate realistic anomalies and tracing patterns for AI analysis.</p>
+                    
+                    <div class="simulator-grid">
+                        <button class="sim-btn" id="sim-slow" title="Simulate 5s slow backend processing">
+                            <i class="fa-solid fa-clock-rotate-left"></i>
+                            <span>Slow Checkout</span>
+                        </button>
+                        <button class="sim-btn" id="sim-error" title="Simulate payment timeout with 70% probability">
+                            <i class="fa-solid fa-triangle-exclamation"></i>
+                            <span>Payment Error</span>
+                        </button>
+                        <button class="sim-btn" id="sim-cpu" title="Simulate high CPU spike loop">
+                            <i class="fa-solid fa-microchip"></i>
+                            <span>CPU Spike</span>
+                        </button>
+                        <button class="sim-btn" id="sim-db" title="Simulate database transaction lock">
+                            <i class="fa-solid fa-database"></i>
+                            <span>DB Lock</span>
+                        </button>
+                        <button class="sim-btn" id="sim-memory" title="Leaks 1 million elements in memory">
+                            <i class="fa-solid fa-memory"></i>
+                            <span>Memory Leak</span>
+                        </button>
+                        <button class="sim-btn" id="sim-external" title="Direct test of httpbin external HTTP call">
+                            <i class="fa-solid fa-cloud-arrow-down"></i>
+                            <span>External API</span>
+                        </button>
+                    </div>
+
+                    <div class="sim-status" id="sim-status-box">
+                        <div class="status-indicator idle"></div>
+                        <span id="sim-status-text">Simulator Idle - Ready to trigger events</span>
+                    </div>
+                </div>
+            </aside>
+        </div>
+    </div>
+
+    <!-- Modal for Order History -->
+    <div class="modal-overlay" id="orders-modal">
+        <div class="modal glass">
+            <div class="modal-header">
+                <h3><i class="fa-solid fa-receipt gold-text"></i> Order History</h3>
+                <button class="close-btn" id="close-modal-btn">&times;</button>
+            </div>
+            <div class="modal-body">
+                <table class="orders-table">
+                    <thead>
+                        <tr>
+                            <th>Order ID</th>
+                            <th>Date</th>
+                            <th>Total</th>
+                            <th>Status</th>
+                        </tr>
+                    </thead>
+                    <tbody id="orders-tbody">
+                        <!-- Orders injected by JS -->
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- Script -->
+    <script src="/static/app.js"></script>
+</body>
+</html>
