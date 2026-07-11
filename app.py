@@ -13,7 +13,7 @@ from sqlalchemy import select, update, insert, text
 
 # Import database schema
 from db import engine, products, orders, order_items
-from telemetry import tracer
+from telemetry import tracer, logger
 
 # Setup Redis
 redis_host = os.environ.get("REDIS_HOST", "localhost")
@@ -24,6 +24,7 @@ r = redis.Redis(host=redis_host, port=redis_port)
 from opentelemetry.instrumentation.fastapi import FastAPIInstrumentor
 from opentelemetry.instrumentation.redis import RedisInstrumentor
 from opentelemetry.instrumentation.requests import RequestsInstrumentor
+from prometheus_fastapi_instrumentator import Instrumentator
 
 # Instrument redis and requests
 RedisInstrumentor().instrument()
@@ -31,7 +32,7 @@ RequestsInstrumentor().instrument()
 
 app = FastAPI(title="Chronos Watch Shop API")
 
-# Instrument FastAPI app
+# Instrument FastAPI app for OpenTelemetry tracing
 FastAPIInstrumentor.instrument_app(app)
 
 # Helper function to serialize SQL Row
@@ -53,14 +54,17 @@ memory_leak_list = []
 
 @app.get("/api/products")
 def get_products():
+    logger.info("GET /api/products - Fetching all products")
     # Attempt to retrieve from Redis cache
     cached_products = r.get("products_cache")
     if cached_products:
         with tracer.start_as_current_span("cache_hit"):
+            logger.info("Products cache hit")
             return json.loads(cached_products)
             
     # Cache miss - query SQL database
     with tracer.start_as_current_span("cache_miss_db_query"):
+        logger.info("Products cache miss - querying database")
         with engine.connect() as conn:
             stmt = select(products)
             result = conn.execute(stmt).fetchall()
@@ -71,21 +75,27 @@ def get_products():
             
             # Save to Redis cache for 60 seconds
             r.setex("products_cache", 60, json.dumps(product_list))
+            logger.info("Fetched %d products from DB and cached them", len(product_list))
             return product_list
 
 @app.get("/api/products/{product_id}")
 def get_product(product_id: int):
+    logger.info("GET /api/products/%d - Fetching product", product_id)
     # Try fetching from cache or database
     with engine.connect() as conn:
         stmt = select(products).where(products.c.id == product_id)
         row = conn.execute(stmt).first()
         if not row:
+            logger.warning("Product ID %d not found", product_id)
             raise HTTPException(status_code=404, detail="Product not found")
         keys = ["id", "name", "brand", "price", "description", "image_url", "stock"]
-        return row_to_dict(row, keys)
+        product_data = row_to_dict(row, keys)
+        logger.info("Successfully fetched product: %s", product_data["name"])
+        return product_data
 
 @app.get("/api/cart")
 def get_cart():
+    logger.info("GET /api/cart - Fetching cart items")
     # Cart is stored in Redis as a hash map under key "cart"
     # Fields are product_id, values are quantities
     cart_raw = r.hgetall("cart")
@@ -112,6 +122,7 @@ def get_cart():
                     "subtotal": subtotal
                 })
                 
+    logger.info("Cart retrieved with %d unique items, total price: $%s", len(cart_items), total_price)
     return {
         "items": cart_items,
         "total_price": total_price
@@ -119,7 +130,9 @@ def get_cart():
 
 @app.post("/api/cart/add")
 def add_to_cart(req: AddToCartRequest):
+    logger.info("POST /api/cart/add - Adding product ID %d (qty: %d) to cart", req.product_id, req.quantity)
     if req.quantity <= 0:
+        logger.warning("Invalid quantity: %d", req.quantity)
         raise HTTPException(status_code=400, detail="Quantity must be greater than 0")
         
     # Check if product exists and check stock
@@ -127,27 +140,34 @@ def add_to_cart(req: AddToCartRequest):
         stmt = select(products.c.stock).where(products.c.id == req.product_id)
         stock = conn.execute(stmt).scalar()
         if stock is None:
+            logger.warning("Product ID %d not found for add to cart", req.product_id)
             raise HTTPException(status_code=404, detail="Product not found")
         if stock < req.quantity:
+            logger.warning("Insufficient stock for product ID %d (requested %d, stock %d)", req.product_id, req.quantity, stock)
             raise HTTPException(status_code=400, detail=f"Insufficient stock. Only {stock} available.")
             
     # Add/Update quantity in Redis
     r.hincrby("cart", req.product_id, req.quantity)
+    logger.info("Product ID %d successfully added to cart", req.product_id)
     return {"status": "success", "message": "Product added to cart"}
 
 @app.post("/api/cart/remove")
 def remove_from_cart(req: RemoveFromCartRequest):
+    logger.info("POST /api/cart/remove - Removing product ID %d from cart", req.product_id)
     # Remove key from Redis hash
     r.hdel("cart", req.product_id)
+    logger.info("Product ID %d removed from cart", req.product_id)
     return {"status": "success", "message": "Product removed from cart"}
 
 @app.post("/api/cart/clear")
 def clear_cart():
+    logger.info("POST /api/cart/clear - Clearing all items from cart")
     r.delete("cart")
     return {"status": "success", "message": "Cart cleared"}
 
 @app.post("/api/checkout")
 def checkout():
+    logger.info("POST /api/checkout - Starting checkout pipeline")
     # Run checkout pipeline inside custom span
     with tracer.start_as_current_span("checkout_pipeline") as checkout_span:
         cart_raw = r.hgetall("cart")
@@ -249,6 +269,7 @@ def checkout():
 
 @app.get("/api/orders")
 def get_orders():
+    logger.info("GET /api/orders - Fetching order history")
     with engine.connect() as conn:
         stmt = select(orders).order_by(orders.c.id.desc())
         result = conn.execute(stmt).fetchall()
@@ -259,6 +280,7 @@ def get_orders():
 
 @app.get("/api/simulate/slow-checkout")
 def simulate_slow_checkout():
+    logger.info("GET /api/simulate/slow-checkout - Simulating slow checkout")
     # Simulates a slow database lock or slow payment response
     with tracer.start_as_current_span("slow_checkout_simulation"):
         time.sleep(5)
@@ -266,6 +288,7 @@ def simulate_slow_checkout():
 
 @app.get("/api/simulate/memory-leak")
 def simulate_memory_leak():
+    logger.info("GET /api/simulate/memory-leak - Simulating memory leak")
     # Appends large list of zeros to global list to leak memory
     global memory_leak_list
     with tracer.start_as_current_span("memory_leak_simulation"):
@@ -274,6 +297,7 @@ def simulate_memory_leak():
 
 @app.get("/api/simulate/payment-error")
 def simulate_payment_error():
+    logger.info("GET /api/simulate/payment-error - Simulating payment gateway error")
     # Simulates a payment processor timeout/exception
     with tracer.start_as_current_span("payment_error_simulation") as span:
         if random.random() > 0.3:
@@ -285,6 +309,7 @@ def simulate_payment_error():
 
 @app.get("/api/simulate/cpu-load")
 def simulate_cpu_load():
+    logger.info("GET /api/simulate/cpu-load - Simulating heavy CPU load")
     # Simulates heavy CPU load
     with tracer.start_as_current_span("cpu_load_simulation"):
         x = 0
@@ -294,6 +319,7 @@ def simulate_cpu_load():
 
 @app.get("/api/simulate/db-lock")
 def simulate_db_lock():
+    logger.info("GET /api/simulate/db-lock - Simulating database lock")
     # Emulates db transaction lock wait
     with engine.connect() as conn:
         with tracer.start_as_current_span("db_lock_simulation"):
@@ -303,6 +329,7 @@ def simulate_db_lock():
 
 @app.get("/api/simulate/external")
 def simulate_external():
+    logger.info("GET /api/simulate/external - Simulating external API call")
     # Simulates an external API call
     with tracer.start_as_current_span("external_api_simulation"):
         resp = requests.get("https://httpbin.org/get")
@@ -316,3 +343,10 @@ app.mount("/static", StaticFiles(directory="static"), name="static")
 @app.get("/")
 def read_index():
     return FileResponse("static/index.html")
+
+@app.get("/health")
+def health_check():
+    return {"status": "ok"}
+
+# Instrument FastAPI app for Prometheus metrics and expose /metrics
+Instrumentator().instrument(app).expose(app)

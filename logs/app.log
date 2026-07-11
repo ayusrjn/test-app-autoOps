@@ -1,0 +1,7 @@
+2026-07-11 08:00:00,545 INFO [orders-api] [app.py:57] [trace_id=427f55f0287f95bf906d941c9e704033 span_id=86b7d4adec14c868] - GET /api/products - Fetching all products
+2026-07-11 08:00:00,548 INFO [orders-api] [app.py:62] [trace_id=427f55f0287f95bf906d941c9e704033 span_id=8aabe584041faee0] - Products cache hit
+2026-07-11 08:00:00,563 INFO [orders-api] [app.py:283] [trace_id=a55c9a829ba401de21b43c7143f1f193 span_id=0534ee25a2d5b014] - GET /api/simulate/slow-checkout - Simulating slow checkout
+2026-07-11 08:07:36,355 INFO [orders-api] [app.py:57] [trace_id=617fa4eb717a7344d75d01ae5f321abe span_id=81937094a4fdec6a] - GET /api/products - Fetching all products
+2026-07-11 08:07:36,358 INFO [orders-api] [app.py:67] [trace_id=617fa4eb717a7344d75d01ae5f321abe span_id=c6698f6fb87e03c4] - Products cache miss - querying database
+2026-07-11 08:07:36,361 INFO [orders-api] [app.py:78] [trace_id=617fa4eb717a7344d75d01ae5f321abe span_id=c6698f6fb87e03c4] - Fetched 8 products from DB and cached them
+2026-07-11 08:07:36,374 INFO [orders-api] [app.py:283] [trace_id=1fd38702b2503ba8118d84cdf791671c span_id=f647cfc182114bf5] - GET /api/simulate/slow-checkout - Simulating slow checkout
