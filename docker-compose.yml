@@ -74,3 +74,29 @@ services:
       - prometheus
       - loki
       - jaeger
+
+
+  backend:
+    image: autoops-backend:latest  # Uses the locally built image
+    environment:
+      - DATABASE_URL=sqlite:////app/data/autoops.db
+      - PROMETHEUS_URL=${PROMETHEUS_URL:-http://prometheus:9090}
+      - LOKI_URL=${LOKI_URL:-http://loki:3100}
+      - JAEGER_URL=${JAEGER_URL:-http://jaeger:16686}
+      - LITELLM_MODEL=${LITELLM_MODEL:-gemini/gemini-2.5-flash}
+      - GEMINI_API_KEY=$(GeminiAPIKey)
+    volumes:
+      - backend-data:/app/data
+    restart: always
+
+  frontend:
+    image: autoops-frontend:latest # Uses the locally built image
+    ports:
+      - "8080:80"
+    depends_on:
+      - backend
+    restart: always
+
+volumes:
+  backend-data:
+
